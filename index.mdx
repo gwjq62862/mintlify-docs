@@ -1,18 +1,25 @@
 ---
 title: "Introduction"
 description: "Welcome to SnapLogs — framework-native logging & monitoring"
+mode: "frame"
 ---
 
-<Hero>
-  <div className="hero-content">
-    <h1>SnapLogs</h1>
-    <p className="hero-tagline">Framework-native logging & monitoring for modern applications</p>
-    <div className="hero-cta">
-      <a href="/quickstart" className="btn-primary">Get Started in 30s</a>
-      <a href="https://github.com/snaplogs" className="btn-secondary" target="_blank">View on GitHub</a>
-    </div>
+<div className="px-4 py-16 lg:py-24 max-w-3xl mx-auto text-center">
+  <h1 className="text-4xl lg:text-5xl font-semibold text-gray-900 dark:text-zinc-50 tracking-tight">
+    SnapLogs
+  </h1>
+  <p className="mt-4 text-lg text-gray-500 dark:text-zinc-500">
+    Framework-native logging &amp; monitoring for modern applications
+  </p>
+  <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+    <a href="/quickstart" className="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700">
+      Get Started in 30s
+    </a>
+    <a href="https://github.com/snaplogs" target="_blank" rel="noreferrer" className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-900 hover:border-gray-400 dark:border-white/20 dark:text-white dark:hover:border-white/40">
+      View on GitHub
+    </a>
   </div>
-</Hero>
+</div>
 
 ## Why SnapLogs?
 
@@ -33,30 +40,30 @@ description: "Welcome to SnapLogs — framework-native logging & monitoring"
 
 ## Supported Frameworks
 
-<Cards>
+<CardGroup cols={2}>
   <Card title="Next.js SDK" icon="triangle" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-next">
     Native App Router & Pages Router support. Client, Server, and Edge runtimes.
   </Card>
   <Card title="NestJS SDK" icon="cube" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-nest">
     Decorators, interceptors, and module-based configuration. Zero-config HTTP logging.
   </Card>
-</Cards>
+</CardGroup>
 
 ---
 
 ## Quick Links
 
-<Cards>
+<CardGroup cols={2}>
   <Card title="Overview" icon="book" href="/overview">
     Architecture, concepts, and how it works
   </Card>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Get logging in 30 seconds
   </Card>
-  <Card title="Next.js SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-next" target="_blank">
+  <Card title="Next.js SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-next">
     Source code & installation
   </Card>
-  <Card title="NestJS SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-nest" target="_blank">
+  <Card title="NestJS SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-nest">
     Source code & installation
   </Card>
-</Cards>
+</CardGroup>
