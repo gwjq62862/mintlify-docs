@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "SnapLogs Documentation",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -14,6 +14,7 @@
         "group": "Getting Started",
         "pages": [
           "index",
+          "overview",
           "quickstart"
         ]
       }
@@ -21,14 +22,14 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "Dashboard",
+          "href": "https://app.snaplogs.com",
+          "icon": "chart-bar"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "GitHub",
+          "href": "https://github.com/snaplogs",
+          "icon": "github"
         }
       ]
     }
@@ -41,13 +42,13 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "href": "mailto:support@snaplogs.com"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "href": "https://app.snaplogs.com"
     }
   },
   "contextual": {
@@ -64,9 +65,9 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "x": "https://x.com/snaplogs",
+      "github": "https://github.com/snaplogs",
+      "linkedin": "https://linkedin.com/company/snaplogs"
     }
   }
 }

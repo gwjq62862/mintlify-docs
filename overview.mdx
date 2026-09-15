@@ -1,0 +1,154 @@
+---
+title: "Overview"
+description: "Architecture, core concepts, and how SnapLogs works"
+---
+
+## Architecture
+
+```
+┌─────────────┐     HTTPS      ┌─────────────┐
+│  Your App   │ ─────────────▶ │  SnapLogs   │
+│  (SDK)      │  Batched Logs  │  API        │
+└─────────────┘                └─────────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    ▼                   ▼                   ▼
+            ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+            │   Dashboard   │   │   Alerts      │   │   Stream      │
+            │   (Query)     │   │   (Notify)    │   │   (SSE)       │
+            └───────────────┘   └───────────────┘   └───────────────┘
+```
+
+---
+
+## Core Concepts
+
+### Log Structure
+
+Every log entry has a consistent structure across all SDKs:
+
+```json
+{
+  "type": "info",
+  "message": "User logged in",
+  "importance": "medium",
+  "timestamp": 1705312800000,
+  "subsystem": "auth",
+  "operation": "login",
+  "track": { "userId": "user-123", "ip": "1.2.3.4" },
+  "metrics": { "latencyMs": 45, "dbQueryCount": 1 },
+  "security": { "authStatus": "success", "tags": ["login"] }
+}
+```
+
+### Log Types
+
+| Type | Purpose | Default Importance |
+|------|---------|-------------------|
+| `info` | General information | `medium` |
+| `error` | Errors & exceptions | `critical` |
+| `audit` | Security/compliance | `medium` |
+| `debug` | Debug/trace | `low` |
+| `metric` | Business metrics | `low` |
+| `warning` | Non-fatal issues | `high` |
+| `success` | Successful ops | `low` |
+
+### Importance Levels
+
+| Level | Value | Use Case |
+|-------|-------|----------|
+| `critical` | 4 | System down, data loss, security breach |
+| `high` | 3 | Errors affecting users, failed payments |
+| `medium` | 2 | Normal operations, audit events |
+| `low` | 1 | Debug, metrics, success events |
+
+---
+
+## SDKs
+
+### Next.js (`@snaplogs/next`)
+
+```ts
+import { createLogger } from '@snaplogs/next'
+
+const logger = createLogger({
+  apiKey: process.env.SNAPLOGS_API_KEY!,
+  appName: 'my-app',
+  environment: 'production'
+})
+
+logger.info('User logged in', { 
+  track: { userId: '123' }, 
+  subsystem: 'auth' 
+})
+```
+
+**Features:** App Router & Pages Router, Client/Server/Edge, `logger.get()`, `logger.stream()`, webhook verification.
+
+### NestJS (`@snaplogs/nest`)
+
+```ts
+// app.module.ts
+import { SnapLogsModule } from '@snaplogs/nest'
+
+@Module({
+  imports: [SnapLogsModule.forRoot({
+    apiKey: process.env.SNAPLOGS_API_KEY!,
+    baseUrl: 'https://api.snaplogs.com/api/v1'
+  })]
+})
+export class AppModule {}
+```
+
+```ts
+// Service
+this.logs.info('User logged in', { track: { userId: '123' } })
+
+// Or decorators
+@Log({ type: 'audit', subsystem: 'auth' })
+@Track({ context: 'user-login' })
+async login() { }
+```
+
+**Features:** Module config (`forRoot`/`forRootAsync`), `@Log`/`@Track`/`@Metrics`/`@NoLog` decorators, global HTTP interceptor, `LoggerService` implementation.
+
+---
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Structured Logging** | Consistent fields: type, importance, subsystem, operation, track, metrics, security |
+| **Auto Batching** | Logs buffered and flushed every 2s (configurable) |
+| **Graceful Shutdown** | Flushes pending logs on SIGINT/SIGTERM |
+| **Query API** | Filter by type, environment, app, search, time range |
+| **Real-time Stream** | SSE-based streaming for live log tailing |
+| **Alerts** | Configure in Dashboard → Alerts (threshold, anomaly, metric) |
+| **Notifications** | Slack, Email, Webhook, PagerDuty, Teams |
+
+---
+
+## Data Flow
+
+1. **Instrument** — Add SDK to your app, log with structured fields
+2. **Transport** — SDK batches logs, sends via HTTPS with retries
+3. **Ingest** — SnapLogs API receives, validates, stores
+4. **Query** — Dashboard or API: filter, search, aggregate
+5. **Alert** — Dashboard rules evaluate, trigger notifications
+6. **Stream** — SSE connection for real-time log viewing
+
+---
+
+## Next Steps
+
+<Cards>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started in 30 seconds
+  </Card>
+  <Card title="Next.js SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-next" target="_blank">
+    Next.js installation & usage
+  </Card>
+  <Card title="NestJS SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-nest" target="_blank">
+    NestJS installation & usage
+  </Card>
+</Cards>
