@@ -1,13 +1,13 @@
 ---
 title: "Overview"
-description: "Architecture, core concepts, and how SnapLogs works"
+description: "Architecture, core concepts, and how SnapLog works"
 ---
 
 ## Architecture
 
 ```text
 ┌─────────────┐     HTTPS      ┌─────────────┐
-│  Your App   │ ─────────────▶ │  SnapLogs   │
+│  Your App   │ ─────────────▶ │  SnapLog   │
 │  (SDK)      │  Batched Logs  │  API        │
 └─────────────┘                └─────────────┘
                                         │
@@ -66,13 +66,13 @@ Every log entry has a consistent structure across all SDKs:
 
 ## SDKs
 
-### Next.js (`@snaplogs/next`)
+### Next.js (`@snaplog/next`)
 
 ```ts
-import { createLogger } from '@snaplogs/next'
+import { createLogger } from '@snaplog/next'
 
 const logger = createLogger({
-  apiKey: process.env.SNAPLOGS_API_KEY!,
+  apiKey: process.env.SNAPLOG_API_KEY!,
   appName: 'my-app',
   environment: 'production'
 })
@@ -85,15 +85,15 @@ logger.info('User logged in', {
 
 **Features:** App Router & Pages Router, Client/Server/Edge, `logger.get()`, `logger.stream()`, webhook verification.
 
-### NestJS (`@snaplogs/nest`)
+### NestJS (`@snaplog/nest`)
 
 ```ts
 // app.module.ts
-import { SnapLogsModule } from '@snaplogs/nest'
+import { SnapLogModule } from '@snaplog/nest'
 
 @Module({
-  imports: [SnapLogsModule.forRoot({
-    apiKey: process.env.SNAPLOGS_API_KEY!,
+  imports: [SnapLogModule.forRoot({
+    apiKey: process.env.SNAPLOG_API_KEY!,
     baseUrl: 'https://api.snaplogs.com/api/v1'
   })]
 })
@@ -132,7 +132,7 @@ async login() { }
 
 1. **Instrument** — Add SDK to your app, log with structured fields
 2. **Transport** — SDK batches logs, sends via HTTPS with retries
-3. **Ingest** — SnapLogs API receives, validates, stores
+3. **Ingest** — SnapLog API receives, validates, stores
 4. **Query** — Dashboard or API: filter, search, aggregate
 5. **Alert** — Dashboard rules evaluate, trigger notifications
 6. **Stream** — SSE connection for real-time log viewing
@@ -144,11 +144,5 @@ async login() { }
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Get started in 30 seconds
-  </Card>
-  <Card title="Next.js SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-next">
-    Next.js installation & usage
-  </Card>
-  <Card title="NestJS SDK" icon="github" href="https://github.com/snaplogs/sdks/tree/main/sdks/snap-logs-nest">
-    NestJS installation & usage
   </Card>
 </CardGroup>
