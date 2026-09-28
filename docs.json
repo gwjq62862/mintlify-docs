@@ -2,12 +2,15 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "SnapLog Documentation",
- "colors": {
-  "primary": "#3843cf",
-  "light":   "#565fe1",
-  "dark":    "#2f37a7"
-},
-  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#3843cf",
+    "light":   "#777fee",
+    "dark":    "#565fe1"
+  },
+  "favicon": "/favicon.png",
+  "thumbnails": {
+    "appearance": "dark"
+  },
   "navigation": {
     "pages": [
       {
