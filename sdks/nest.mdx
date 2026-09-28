@@ -1,0 +1,230 @@
+---
+title: "NestJS"
+description: "Send structured logs from NestJS, with decorators or the logger service"
+---
+
+`@snaplog/nest` is a high-performance logging and observability integration for NestJS.
+Register the module once and log from services, controllers, or the framework's own
+logger.
+
+## Installation
+
+```bash
+npm install @snaplog/nest
+```
+
+`@nestjs/common` `^10 || ^11` and `rxjs` `^7` are peer dependencies.
+
+## Quick start
+
+### 1. Register the module
+
+```ts
+import { Module } from "@nestjs/common";
+import { SnapLogModule } from "@snaplog/nest";
+
+@Module({
+  imports: [
+    SnapLogModule.forRoot({
+      apiKey: process.env.SNAPLOG_API_KEY!,
+      appName: "payment-service",
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+That is all the setup there is. There are three ways to log, and you can mix them:
+
+- **Automatic** — set `autoLog: true` and every request is logged
+- **Manual** — call `SnapLogService` yourself
+- **Decorators** — tag route handlers and let the interceptor log them
+
+## Automatic request logging
+
+```ts
+SnapLogModule.forRoot({
+  apiKey: process.env.SNAPLOG_API_KEY!,
+  appName: "payment-service",
+  autoLog: true,
+});
+```
+
+With this on, the module registers its request interceptor globally and every incoming
+request is logged with its method, path, status code, and latency. Decorators and manual
+`SnapLogService` calls still work on top.
+
+Left out or set to `false`, which is the default, nothing is logged automatically.
+
+## Manual logging
+
+Inject `SnapLogService` anywhere you need explicit control.
+
+```ts
+import { Injectable } from "@nestjs/common";
+import { SnapLogService } from "@snaplog/nest";
+
+@Injectable()
+export class AuthService {
+  constructor(private readonly logger: SnapLogService) {}
+
+  async validateUser(username: string) {
+    this.logger.info("Validating user session", { subsystem: "auth" });
+
+    this.logger.audit("User login attempt", {
+      security: { auth_status: "failed", tags: ["login"] },
+      track: { user_id: username },
+    });
+  }
+}
+```
+
+## Decorator tracing
+
+The `@Log`, `@Track`, `@Metrics`, and `@NoLog` decorators attach metadata to a route
+handler. The interceptor installed by `SnapLogModule` reads it and logs automatically, so
+there is no extra registration to do.
+
+```ts
+import { Controller, Get, Post } from "@nestjs/common";
+import { Log, NoLog } from "@snaplog/nest";
+
+@Controller("users")
+export class UserController {
+  @Post()
+  @Log({ message: "User registration endpoint hit", importance: "high" })
+  async createUser() {
+    // controller logic
+  }
+
+  @Get("health")
+  @NoLog() // mute noisy polling logs
+  async healthCheck() {
+    return { status: "ok" };
+  }
+}
+```
+
+<Note>
+  Decorators work through an interceptor, so they apply to requests dispatched by the
+  framework — controllers and route handlers. They do not wrap plain injectable methods
+  you call internally. Use `SnapLogService` for that.
+</Note>
+
+### Decorator options
+
+| Decorator | Options |
+|-----------|---------|
+| `@Log` | `type`, `importance`, `message`, `track`, `skipSuccess`, `skipError` |
+| `@Track` | `context`, `attributes` |
+| `@Metrics` | `name`, `tags` |
+| `@NoLog` | none — mutes logging for the handler |
+
+## Replace the NestJS logger
+
+`SnapLogService` implements NestJS's `LoggerService`, so it can back the framework's own
+bootstrap logging.
+
+```ts
+import { NestFactory } from "@nestjs/core";
+import { SnapLogService } from "@snaplog/nest";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  app.useLogger(app.get(SnapLogService));
+
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+## Async configuration
+
+Load your key from `@nestjs/config` with `forRootAsync`.
+
+```ts
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { SnapLogModule } from "@snaplog/nest";
+
+SnapLogModule.forRootAsync({
+  imports: [ConfigModule],
+  useFactory: (configService: ConfigService) => ({
+    apiKey: configService.getOrThrow<string>("SNAPLOG_API_KEY"),
+    appName: configService.get<string>("APP_NAME"),
+  }),
+  inject: [ConfigService],
+});
+```
+
+## Logging
+
+| Method | Use for |
+|--------|---------|
+| `info` | General information |
+| `warn` | Non-fatal issues |
+| `error` | Errors and exceptions, with an optional trace |
+| `audit` | Security and compliance events |
+| `metric` | Business and performance metrics |
+| `debug` | Debug and trace output |
+| `log` | Generic info, with a NestJS-style context string |
+| `emit` | Set the type directly: `emit(type, message, meta?)` |
+
+`info`, `audit`, and `metric` take a message and an optional metadata object:
+
+```ts
+this.logger.info("User created", {
+  subsystem: "auth",
+  operation: "signup",
+  track: { user_id: data.id },
+  metrics: { latency_ms: 12, db_query_count: 1 },
+});
+```
+
+`log`, `warn`, and `debug` take a context string, matching NestJS's own logger:
+
+```ts
+this.logger.warn("Slow request", "Http");
+this.logger.debug("Cache miss", "CacheService");
+```
+
+`error` accepts either a trace string or a metadata object:
+
+```ts
+this.logger.error("Charge failed", err.stack, "PaymentService");
+this.logger.error("Charge failed", { operation: "charge-card", track: { user_id: "user_123" } });
+```
+
+## Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `apiKey` | `string` | **Required** | Ingest API authentication key. |
+| `appName` | `string` | `snaplog-app` | Identifier for your service. |
+| `environment` | `string` | `NODE_ENV` or `development` | Environment context. |
+| `autoLog` | `boolean` | `false` | Logs every request automatically. |
+| `batchSize` | `number` | `100` | Log count that triggers an auto-flush. |
+| `flushIntervalMs` | `number` | `2000` | How long logs stay in the queue. |
+| `maxRetries` | `number` | `3` | Retry attempts per batch. |
+| `retryDelayMs` | `number` | `1000` | Initial backoff delay. Doubles each attempt. |
+
+## Delivery
+
+Logs are batched and flushed on a timer or once `batchSize` is reached. A failed send is
+retried with exponential backoff, and only retryable responses are retried: `408`, `429`,
+and any `5xx`.
+
+Buffered logs are flushed automatically when the module is destroyed, so you do not need
+to do anything on shutdown.
+
+## Exports
+
+| Export | Purpose |
+|--------|---------|
+| `SnapLogModule` | `forRoot` and `forRootAsync` registration. |
+| `SnapLogService` | The logger, and a drop-in `LoggerService`. |
+| `@Log` `@Track` `@Metrics` `@NoLog` | Route handler decorators. |
+| `SnapLogInterceptor` | Request logging interceptor. |
+| `SnapLogDecoratorInterceptor` | Reads decorator metadata. |
+| `SnapLogTransport` | Low-level transport. |

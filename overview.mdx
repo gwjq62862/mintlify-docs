@@ -5,19 +5,8 @@ description: "Architecture, core concepts, and how SnapLog works"
 
 ## Architecture
 
-```text
-┌─────────────┐     HTTPS      ┌─────────────┐
-│  Your App   │ ─────────────▶ │  SnapLog   │
-│  (SDK)      │  Batched Logs  │  API        │
-└─────────────┘                └─────────────┘
-                                        │
-                    ┌───────────────────┼───────────────────┐
-                    ▼                   ▼                   ▼
-            ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-            │   Dashboard   │   │   Alerts      │   │   Stream      │
-            │   (Query)     │   │   (Notify)    │   │   (SSE)       │
-            └───────────────┘   └───────────────┘   └───────────────┘
-```
+See [Architecture](/architecture) for a diagram of how a log travels from your app to
+your dashboard and alerts.
 
 ---
 
@@ -35,113 +24,82 @@ Every log entry has a consistent structure across all SDKs:
   "timestamp": 1705312800000,
   "subsystem": "auth",
   "operation": "login",
-  "track": { "userId": "user-123", "ip": "1.2.3.4" },
-  "metrics": { "latencyMs": 45, "dbQueryCount": 1 },
-  "security": { "authStatus": "success", "tags": ["login"] }
+  "track": { "user_id": "user-123", "ip": "1.2.3.4" },
+  "metrics": { "latency_ms": 45, "db_query_count": 1 },
+  "security": { "auth_status": "success", "tags": ["login"] }
 }
 ```
 
+Field names are snake_case across every SDK.
+
 ### Log Types
 
-| Type | Purpose | Default Importance |
-|------|---------|-------------------|
-| `info` | General information | `medium` |
-| `error` | Errors & exceptions | `critical` |
-| `audit` | Security/compliance | `medium` |
-| `debug` | Debug/trace | `low` |
-| `metric` | Business metrics | `low` |
-| `warning` | Non-fatal issues | `high` |
-| `success` | Successful ops | `low` |
+The available types depend on which SDK you use, because the method names differ:
+
+| Type | Next.js | Express | NestJS |
+|------|---------|---------|--------|
+| `info` | `info()` | `info()` | `info()` |
+| Non-fatal issue | `warning()` | `warn()` | `warn()` |
+| `error` | `error()` | `error()` | `error()` |
+| `audit` | `audit()` | `audit()` | `audit()` |
+| `debug` | `debug()` | `debug()` | `debug()` |
+| `metric` | `metric()` | `metric()` | `metric()` |
+| `success` | `success()` | — | — |
+
+Each SDK exposes the method name that matches its own conventions.
 
 ### Importance Levels
 
-| Level | Value | Use Case |
-|-------|-------|----------|
-| `critical` | 4 | System down, data loss, security breach |
-| `high` | 3 | Errors affecting users, failed payments |
-| `medium` | 2 | Normal operations, audit events |
-| `low` | 1 | Debug, metrics, success events |
+Set how urgent a log is. SnapLog orders these for you — you never set a numeric value.
+
+| Level | Use Case |
+|-------|----------|
+| `critical` | System down, data loss, security breach |
+| `high` | Errors affecting users, failed payments |
+| `medium` | Normal operations, audit events |
+| `low` | Debug, metrics, success events |
 
 ---
 
 ## SDKs
 
-### Next.js (`@snaplog/next`)
+Pick the SDK for your framework. Each one has its own page covering setup, every logging
+method, configuration, and webhook verification.
 
-```ts
-import { createLogger } from '@snaplog/next'
-
-const logger = createLogger({
-  apiKey: process.env.SNAPLOG_API_KEY!,
-  appName: 'my-app',
-  environment: 'production'
-})
-
-logger.info('User logged in', { 
-  track: { userId: '123' }, 
-  subsystem: 'auth' 
-})
-```
-
-**Features:** App Router & Pages Router, Client/Server/Edge, `logger.get()`, `logger.stream()`, webhook verification.
-
-### NestJS (`@snaplog/nest`)
-
-```ts
-// app.module.ts
-import { SnapLogModule } from '@snaplog/nest'
-
-@Module({
-  imports: [SnapLogModule.forRoot({
-    apiKey: process.env.SNAPLOG_API_KEY!,
-    baseUrl: 'https://api.snaplogs.com/api/v1'
-  })]
-})
-export class AppModule {}
-```
-
-```ts
-// Service
-this.logs.info('User logged in', { track: { userId: '123' } })
-
-// Or decorators
-@Log({ type: 'audit', subsystem: 'auth' })
-@Track({ context: 'user-login' })
-async login() { }
-```
-
-**Features:** Module config (`forRoot`/`forRootAsync`), `@Log`/`@Track`/`@Metrics`/`@NoLog` decorators, global HTTP interceptor, `LoggerService` implementation.
+<CardGroup cols={3}>
+  <Card title="Next.js" icon="code" href="/sdks/next">
+    `@snaplog/next`
+  </Card>
+  <Card title="Express" icon="code" href="/sdks/express">
+    `@snaplog/express`
+  </Card>
+  <Card title="NestJS" icon="code" href="/sdks/nest">
+    `@snaplog/nest`
+  </Card>
+</CardGroup>
 
 ---
 
 ## Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Structured Logging** | Consistent fields: type, importance, subsystem, operation, track, metrics, security |
-| **Auto Batching** | Logs buffered and flushed every 2s (configurable) |
-| **Graceful Shutdown** | Flushes pending logs on SIGINT/SIGTERM |
-| **Query API** | Filter by type, environment, app, search, time range |
-| **Real-time Stream** | SSE-based streaming for live log tailing |
-| **Alerts** | Configure in Dashboard → Alerts (threshold, anomaly, metric) |
-| **Notifications** | Slack, Email, Webhook, PagerDuty, Teams |
+| Feature | What you get |
+|---------|--------------|
+| **Structured logs** | Every log carries the same fields, so you can filter and search across all your apps |
+| **Automatic batching** | Logs are bundled and sent every 2 seconds, so logging never slows down your app |
+| **Search and filter** | Narrow results by type, environment, app, or free-text search |
+| **Live tail** | Watch logs appear in the dashboard the moment they arrive |
+| **Alerts** | Set a threshold over a time window, and get notified when it's crossed |
+| **Notifications** | Send alerts to Slack, Discord, email, or any webhook you own |
+| **No lost logs on shutdown** | Pending logs are flushed when your app stops |
 
 ---
 
-## Data Flow
-
-1. **Instrument** — Add SDK to your app, log with structured fields
-2. **Transport** — SDK batches logs, sends via HTTPS with retries
-3. **Ingest** — SnapLog API receives, validates, stores
-4. **Query** — Dashboard or API: filter, search, aggregate
-5. **Alert** — Dashboard rules evaluate, trigger notifications
-6. **Stream** — SSE connection for real-time log viewing
-
----
-
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    See how a log travels through SnapLog
+  </Card>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Get started in 30 seconds
   </Card>

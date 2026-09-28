@@ -1,0 +1,254 @@
+---
+title: "Express"
+description: "Send structured logs from Express, with automatic request and error logging"
+---
+
+`@snaplog/express` sends structured, batched events from an Express app. Events are
+buffered in memory and delivered in the background, so your responses stay fast.
+
+## Installation
+
+```bash
+npm install @snaplog/express
+```
+
+`express` `^4` or `^5` is required as a peer dependency.
+
+## Quick start
+
+### 1. Create a logger
+
+```ts
+// log.ts
+import { createLogger } from "@snaplog/express";
+
+export const log = createLogger({
+  apiKey: process.env.SNAPLOG_API_KEY!,
+  appName: "auth-service",
+  environment: process.env.NODE_ENV ?? "development",
+});
+```
+
+### 2. Attach the middleware
+
+```ts
+import express from "express";
+import { snapLogMiddleware, snapLogErrorHandler } from "@snaplog/express";
+import { log } from "./log";
+
+const app = express();
+
+// Log every request automatically
+app.use(snapLogMiddleware(log, { autoLog: true }));
+
+// ...routes...
+
+// Register after all routes
+app.use(snapLogErrorHandler(log));
+```
+
+### 3. Log anywhere
+
+```ts
+app.post("/users", (req, res) => {
+  log.info("User created", {
+    subsystem: "db",
+    operation: "create-user",
+    track: { user_id: req.body.id },
+  });
+
+  return res.json({ ok: true });
+});
+```
+
+## Automatic request logging
+
+Setting `autoLog: true` logs every incoming request with no extra code. Each request
+produces an `audit` event carrying:
+
+| Field | Description |
+|-------|-------------|
+| `track.requestId` | From `x-request-id` or `x-correlation-id`, or a generated UUID. |
+| `track.method` | HTTP method. |
+| `track.path` | Request URL. |
+| `track.statusCode` | Response status. Importance becomes `high` at 400 or above. |
+| `track.latencyMs` | Response time in milliseconds. |
+| `track.userAgent` | The `User-Agent` header. |
+| `userId` | `req.user?.id` or `req.user?.userId` when present. |
+
+<Note>
+  The fields the middleware generates are camelCase, as shown above. Any `track` data you
+  pass yourself uses snake_case, matching the other SDKs.
+</Note>
+
+Change which header supplies the request id:
+
+```ts
+app.use(snapLogMiddleware(log, { requestIdHeader: "x-request-id" }));
+```
+
+Requests that abort mid-flight, such as a client disconnect, are logged as `error`
+events instead.
+
+Leave `autoLog` off — the default is `false` — to log nothing automatically and call the
+logger yourself.
+
+## Error handling
+
+`snapLogErrorHandler` captures thrown errors with their stack traces. Register it after
+all your routes.
+
+```ts
+app.use(snapLogErrorHandler(log));
+```
+
+Errors are logged as `error` events with the message and stack in `track.error` and
+`track.stack`. Turn the stack off with:
+
+```ts
+app.use(snapLogErrorHandler(log, { includeStack: false }));
+```
+
+<Note>
+  The handler calls `next(err)` after logging, so your existing error handling is
+  unaffected.
+</Note>
+
+## Logging
+
+| Method | Use for |
+|--------|---------|
+| `info` | General information |
+| `warn` | Non-fatal issues |
+| `error` | Errors and exceptions |
+| `audit` | Security and compliance events |
+| `debug` | Debug and trace output |
+| `metric` | Business and performance metrics |
+| `log` | Generic info, with a NestJS-style context string |
+| `emit` | Set the type directly: `emit(type, message, meta?)` |
+| `flush` | Force-flush buffered logs. |
+| `destroy` | Stop timers after a final flush. |
+
+### Metadata
+
+Every manual method takes a message and an optional metadata object supporting
+`importance`, `subsystem`, `operation`, `track`, `security`, `metrics`, `userId`,
+`service`, `appName`, `environment`, and `timestamps`.
+
+```ts
+log.warn("Payment provider responding slowly", {
+  importance: "medium",
+  subsystem: "network",
+  metrics: { latency_ms: 1850, db_query_count: 0 },
+});
+
+log.audit("Administrator changed a user role", {
+  security: { auth_status: "success", tags: ["permissions", "admin"] },
+  track: { user_id: "user_123", role: "admin" },
+});
+
+log.metric("Database query completed", {
+  metrics: { latency_ms: 42, db_query_count: 1 },
+});
+```
+
+The NestJS-style methods take a context string instead:
+
+```ts
+log.log("Generic info message", "AuthService");
+log.warn("Slow request", "Http");
+log.error("Something failed", "SomeStack");
+```
+
+## Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `apiKey` | `string` | **Required** | Ingest API authentication key. |
+| `appName` | `string` | `snaplog-app` | Identifier for your application. |
+| `environment` | `string` | `NODE_ENV` or `development` | Runtime environment context. |
+| `batchSize` | `number` | `100` | Log count that triggers an auto-flush. |
+| `flushIntervalMs` | `number` | `2000` | How long logs stay in the queue. |
+| `maxRetries` | `number` | `3` | Retry attempts per batch. |
+| `retryDelayMs` | `number` | `1000` | Initial backoff delay. Doubles each attempt. |
+| `autoLog` | `boolean` | `false` | Default for `snapLogMiddleware`. |
+
+## Delivery
+
+Logs are batched and flushed on a timer or once `batchSize` is reached. A failed send is
+retried with exponential backoff, and only retryable responses are retried: `408`, `429`,
+and any `5xx`. A batch that exhausts its retries is dropped with a console error.
+
+Each request has a 10 second timeout. The in-memory queue holds up to 10,000 logs; when
+full, the oldest is dropped.
+
+Flush before you exit if you are not relying on the process exit hooks:
+
+```ts
+await log.flush();
+
+// or, to flush and stop the background timers
+await log.destroy();
+```
+
+## Verify webhooks
+
+Verify SnapLog alert webhooks before processing them. The signature and timestamp come
+from the `x-spl-signature` and `x-spl-timestamp` headers.
+
+```ts
+import { verifyWebhookRequest } from "@snaplog/express/webhook";
+
+app.post(
+  "/webhooks/snaplog",
+  express.json({
+    verify: (req, res, buf) => {
+      (req as any).rawBody = buf;
+    },
+  }),
+  (req, res) => {
+    try {
+      const { event } = verifyWebhookRequest(
+        req,
+        process.env.SNAPLOG_WEBHOOK_SECRET!,
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      res.status(401).json({ success: false, error: "Invalid webhook signature" });
+    }
+  },
+);
+```
+
+<Warning>
+  HMAC signing uses the raw request body, so you must enable the `rawBody` capture shown
+  above or verification will fail.
+</Warning>
+
+For lower-level use:
+
+```ts
+import { verifyWebhookSignature } from "@snaplog/express/webhook";
+
+verifyWebhookSignature({
+  signature: "...",
+  timestamp: "...",
+  body: rawBodyString,
+  secret: process.env.SNAPLOG_WEBHOOK_SECRET!,
+});
+```
+
+Webhooks older than 60 seconds are rejected. Pass `maxAgeMs` to change that.
+
+## Exports
+
+| Export | Purpose |
+|--------|---------|
+| `createLogger(config)` | Creates a logger with a batching transport. |
+| `SnapLogLogger` | The logger class, for typing. |
+| `snapLogMiddleware(logger, options?)` | Request logging middleware. |
+| `snapLogErrorHandler(logger, options?)` | Error capture middleware. |
+| `verifyWebhookRequest(req, secret, maxAgeMs?)` | Verifies an Express request. |
+| `verifyWebhookSignature(options)` | Verifies a raw HMAC payload. |
+| `SnapLogTransport`, `BatchProcessor` | Low-level classes for custom use. |

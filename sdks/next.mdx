@@ -1,0 +1,325 @@
+---
+title: "Next.js"
+description: "Send structured logs from Route Handlers, Server Actions"
+---
+
+`@snaplog/next` is the official Next.js SDK. Send events from server-side code, query
+stored logs, stream live events into client components, and verify alert webhooks.
+
+## Requirements
+
+- A Next.js app using the App Router
+- A SnapLog API key
+- A runtime with native `fetch`, `Request`, `Response`, and `ReadableStream`
+
+## Installation
+
+```bash
+npm install @snaplog/next
+```
+
+## Quick start
+
+### 1. Add your API key
+
+Add the key to `.env.local`. Keep it server-side — never prefix it with `NEXT_PUBLIC_`.
+
+```env
+SNAPLOG_API_KEY=your_api_key
+```
+
+### 2. Create a shared logger
+
+Create the logger in a server-only module such as `lib/logs.ts`. Do not import it into
+a client component.
+
+```ts
+// lib/logs.ts
+import { createLogger } from "@snaplog/next";
+
+export const log = createLogger({
+  apiKey: process.env.SNAPLOG_API_KEY!,
+  appName: "my-next-app",
+  environment: process.env.NODE_ENV ?? "development",
+});
+```
+
+### 3. Send an event
+
+Use the logger in Route Handlers, Server Actions, or any server-side module.
+
+```ts
+// app/api/orders/route.ts
+import { log } from "@/lib/logs";
+
+export async function POST(request: Request) {
+  const order = await request.json();
+
+  await log.info({
+    message: "Order received",
+    subsystem: "network",
+    operation: "create-order",
+    track: { user_id: order.userId },
+  });
+
+  return Response.json({ ok: true });
+}
+```
+
+Events are buffered in memory and flushed in the background, so your handler is not
+waiting on the network.
+
+## Logging
+
+The logger is explicit by design. Nothing is logged automatically — you call it at each
+site you want to capture.
+
+<Tabs>
+  <Tab title="Methods">
+    | Method | Use for |
+    |--------|---------|
+    | `info` | General information |
+    | `warning` | Non-fatal issues |
+    | `error` | Errors and exceptions |
+    | `audit` | Security and compliance events |
+    | `debug` | Debug and trace output |
+    | `metric` | Business and performance metrics |
+    | `success` | Successful operations |
+    | `send` | Set the type directly in the payload |
+  </Tab>
+
+  <Tab title="Examples">
+    ```ts
+    await log.info({
+      message: "Checkout started",
+      operation: "checkout",
+    });
+
+    await log.warning({
+      message: "Payment provider is responding slowly",
+      importance: "medium",
+      subsystem: "network",
+      metrics: { latency_ms: 1850, db_query_count: 0 },
+    });
+
+    await log.error({
+      message: "Payment failed",
+      importance: "high",
+      subsystem: "db",
+      operation: "charge-card",
+    });
+
+    await log.audit({
+      message: "Administrator changed a user role",
+      security: { auth_status: "success", tags: ["permissions", "admin"] },
+      track: { user_id: "user_123", role: "admin" },
+    });
+
+    await log.metric({
+      message: "Database query completed",
+      metrics: { latency_ms: 42, db_query_count: 1 },
+    });
+    ```
+
+    Use `send` when you want to set the type in the payload:
+
+    ```ts
+    await log.send({
+      type: "success",
+      message: "Deployment completed",
+      importance: "low",
+    });
+    ```
+  </Tab>
+</Tabs>
+
+Every method takes a single payload object. Note this differs from the Express and NestJS
+SDKs, which take a message and an optional metadata object.
+
+## Fields
+
+<CodeGroup>
+```ts
+track: {
+  user_id?: string;
+  role?: string;
+  ip?: string;
+  user_agent?: string;
+  geo?: string;
+}
+```
+
+```ts
+security: {
+  auth_status?: "success" | "failed" | "expire";
+  suspicious?: boolean;
+  tags?: string[];
+}
+```
+
+```ts
+metrics: {
+  latency_ms: number;   // required
+  db_query_count: number; // required
+}
+```
+</CodeGroup>
+
+<Note>
+  Field names are snake_case. Both `metrics` fields are required, so if you pass `metrics`
+  you must pass both. `subsystem` accepts `"db"`, `"queue"`, or `"network"`.
+</Note>
+
+## Configuration
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `apiKey` | `string` | Yes | Your SnapLog API key. |
+| `appName` | `string` | No | Default application name. Falls back to `default`. |
+| `environment` | `string` | No | Default environment. Falls back to `NODE_ENV`, then `development`. |
+
+## Delivery
+
+Logs are buffered in memory and flushed every 2 seconds, or earlier once the buffer
+reaches its batch size. Pending logs are flushed automatically on `SIGINT`, `SIGTERM`,
+and `beforeExit` when running on Node.
+
+## Reading logs in the browser
+
+`getLogs` and `getStream` are React hooks for client components. Both go through a route
+handler in your own app, so your API key is never sent to the browser.
+
+### Historical logs
+
+```tsx
+"use client";
+
+import { getLogs } from "@snaplog/next";
+
+export default function ErrorList() {
+  const { data, isLoading, error, refetch } = getLogs({ type: "error" });
+
+  if (isLoading) return <p>Loading…</p>;
+  if (error) return <p>{error.message}</p>;
+
+  return (
+    <div>
+      <button onClick={refetch}>Refresh</button>
+      {data?.map((event, index) => (
+        <p key={index}>{event.message}</p>
+      ))}
+    </div>
+  );
+}
+```
+
+### Live events
+
+`getStream` opens an SSE connection and keeps up to 5,000 events in memory.
+
+```tsx
+"use client";
+
+import { getStream } from "@snaplog/next";
+
+export default function LiveEvents() {
+  const { data, isLoading, error, connected, disconnect } = getStream({
+    appName: "my-next-app",
+  });
+
+  return (
+    <section>
+      <p>{connected ? "Connected" : "Disconnected"}</p>
+      <button onClick={disconnect}>Disconnect</button>
+      {isLoading && <p>Connecting…</p>}
+      {error && <p>{error.message}</p>}
+      {data.map((event) => (
+        <p key={event.id}>
+          [{event.level}] {event.message}
+        </p>
+      ))}
+    </section>
+  );
+}
+```
+
+### Proxy route handlers
+
+You only need these if you use `getLogs` or `getStream` from a client component. If you
+only send logs, or fetch data on the server, you can skip this section.
+
+<Note>
+  The route folder is `app/api/snapLogs` — plural, to match the paths the hooks request.
+</Note>
+
+```ts
+// app/api/snapLogs/logs/route.ts
+export async function GET(request: Request) {
+  const url = new URL("https://api.trysnaplog.com/api/v1/logs");
+  url.search = new URLSearchParams(request.nextUrl.searchParams).toString();
+
+  const res = await fetch(url, {
+    headers: { "x-api-key": process.env.SNAPLOG_API_KEY! },
+    cache: "no-store",
+  });
+
+  return new Response(res.body, { status: res.status, headers: res.headers });
+}
+```
+
+```ts
+// app/api/snapLogs/stream/route.ts
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  const url = new URL("https://api.trysnaplog.com/api/v1/logs/stream");
+  url.search = new URLSearchParams(request.nextUrl.searchParams).toString();
+
+  const res = await fetch(url, {
+    headers: { "x-api-key": process.env.SNAPLOG_API_KEY! },
+  });
+
+  return new Response(res.body, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+```
+
+## Verify webhooks
+
+If you receive SnapLog alert webhooks, verify the signature before acting on the event.
+
+```ts
+// app/api/webhooks/snaplog/route.ts
+import { verifyWebhookRequest } from "@snaplog/next";
+
+export async function POST(request: Request) {
+  try {
+    const { verified, event } = await verifyWebhookRequest(
+      request,
+      process.env.SNAPLOG_WEBHOOK_SECRET!,
+    );
+
+    return Response.json({ success: verified });
+  } catch (err) {
+    return Response.json(
+      { success: false, error: "Invalid webhook signature" },
+      { status: 401 },
+    );
+  }
+}
+```
+
+## Exports
+
+| Export | Purpose |
+|--------|---------|
+| `createLogger(config)` | Creates the server-side logger. |
+| `getLogs(filters?)` | Client hook for querying stored events. |
+| `getStream(filters?)` | Client hook for consuming live events over SSE. |
+| `verifyWebhookRequest(...)` | Verifies a webhook HMAC signature. |
+| `SPLTransport` | Low-level transport used by the logger. |

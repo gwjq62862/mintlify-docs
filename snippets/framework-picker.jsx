@@ -52,17 +52,18 @@ import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
   const body = await request.json()
-  logger.info('User created', {
-    track: { userId: body.id, email: body.email },
-    metrics: { latencyMs: 12, dbQueryCount: 1 },
-    subsystem: 'auth',
+  logger.info({
+    message: 'User created',
+    track: { user_id: body.id },
+    metrics: { latency_ms: 12, db_query_count: 1 },
+    subsystem: 'db',
     operation: 'signup'
   })
   return Response.json({ ok: true })
 }`}</CodeBlock>
 
           <h3 className="text-lg font-semibold">4. Verify</h3>
-          <p>Open your <a href="https://app.snaplogs.com" target="_blank" rel="noreferrer">SnapLog Dashboard</a> → <strong>Logs</strong> → See your entry</p>
+          <p>Open your <a href="https://app.trysnaplog.com" target="_blank" rel="noreferrer">SnapLog Dashboard</a> → <strong>Logs</strong> → See your entry</p>
         </div>
       )}
 
@@ -80,7 +81,7 @@ import { SnapLogModule } from '@snaplog/nest'
   imports: [
     SnapLogModule.forRoot({
       apiKey: process.env.SNAPLOG_API_KEY!,
-      baseUrl: 'https://api.snaplogs.com/api/v1',
+      baseUrl: 'https://api.trysnaplog.com/api/v1',
       appName: 'my-app',
       environment: process.env.NODE_ENV || 'development'
     })
@@ -99,8 +100,8 @@ export class UserService {
 
   async createUser(data: CreateUserDto) {
     this.logs.info('User created', {
-      track: { userId: data.id, email: data.email },
-      metrics: { latencyMs: 12, dbQueryCount: 1 },
+      track: { user_id: data.id },
+      metrics: { latency_ms: 12, db_query_count: 1 },
       subsystem: 'auth',
       operation: 'signup'
     })
@@ -117,7 +118,7 @@ async create(@Body() data: CreateUserDto) {
 }`}</CodeBlock>
 
           <h3 className="text-lg font-semibold">5. Verify</h3>
-          <p>Open your <a href="https://app.snaplogs.com" target="_blank" rel="noreferrer">SnapLog Dashboard</a> → <strong>Logs</strong> → See your entry</p>
+          <p>Open your <a href="https://app.trysnaplog.com" target="_blank" rel="noreferrer">SnapLog Dashboard</a> → <strong>Logs</strong> → See your entry</p>
         </div>
       )}
 
@@ -153,7 +154,7 @@ app.use(snapLogErrorHandler(log))`}</CodeBlock>
           <h3 className="text-lg font-semibold">4. Log Anywhere</h3>
           <CodeBlock language="ts">{`app.post('/users', (req, res) => {
   log.info('User created', {
-    track: { userId: req.body.id },
+    track: { user_id: req.body.id },
     subsystem: 'auth',
     operation: 'signup'
   })
@@ -161,7 +162,7 @@ app.use(snapLogErrorHandler(log))`}</CodeBlock>
 })`}</CodeBlock>
 
           <h3 className="text-lg font-semibold">5. Verify</h3>
-          <p>Open your <a href="https://app.snaplogs.com" target="_blank" rel="noreferrer">SnapLog Dashboard</a> → <strong>Logs</strong> → See your entry</p>
+          <p>Open your <a href="https://app.trysnaplog.com" target="_blank" rel="noreferrer">SnapLog Dashboard</a> → <strong>Logs</strong> → See your entry</p>
         </div>
       )}
     </div>
